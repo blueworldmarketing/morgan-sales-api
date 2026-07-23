@@ -64,14 +64,15 @@ function escapeHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
-function buildPaymentEmailHtml(customerName) {
+function buildPaymentEmailHtml(customerName, paymentLink) {
   const name = escapeHtml(customerName);
+  const link = escapeHtml(paymentLink);
   return `
     <p>Hi ${name},</p>
     <p>Thank you for your order!</p>
     <p>
       Please complete your payment using this secure link:<br />
-      <a href="${PAYMENT_LINK}">${PAYMENT_LINK}</a>
+      <a href="${link}">${link}</a>
     </p>
     <p>Once payment is received we will process your order right away.</p>
     <p>
@@ -161,11 +162,21 @@ app.post("/create-order", requireAgentSecret, async (req, res) => {
 
     const { data: order } = await wcClient.post("/orders", orderPayload);
 
+    const orderId = order.id;
+    const orderKey = order.order_key;
+    if (!orderId || !orderKey) {
+      throw new Error("WooCommerce order missing id or order_key");
+    }
+
+    const paymentLink =
+      `https://www.nationwidepeptides.com/checkout/order-pay/${orderId}/` +
+      `?pay_for_order=true&key=${orderKey}`;
+
     const { error: emailError } = await resend.emails.send({
       from: EMAIL_FROM,
       to: customer_email,
       subject: "Your Nationwide Peptides Order – Payment Link",
-      html: buildPaymentEmailHtml(customer_name),
+      html: buildPaymentEmailHtml(customer_name, paymentLink),
     });
 
     if (emailError) {
@@ -174,7 +185,7 @@ app.post("/create-order", requireAgentSecret, async (req, res) => {
 
     return res.status(201).json({
       ok: true,
-      order_id: order.id,
+      order_id: orderId,
       message: "Order created and email sent",
     });
   } catch (err) {
