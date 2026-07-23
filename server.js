@@ -113,12 +113,21 @@ app.post("/create-order", requireAgentSecret, async (req, res) => {
       shipping_address,
       to,
       total_amount,
+      product_id,
     } = req.body || {};
 
     if (!customer_name || !customer_email || !shipping_address) {
       return res.status(400).json({
         ok: false,
         error: "customer_name, customer_email, and shipping_address are required",
+      });
+    }
+
+    const resolvedProductId = Number(product_id) || DEFAULT_PRODUCT_ID;
+    if (!Number.isFinite(resolvedProductId) || resolvedProductId < 1) {
+      return res.status(400).json({
+        ok: false,
+        error: "product_id must be a positive number",
       });
     }
 
@@ -143,7 +152,7 @@ app.post("/create-order", requireAgentSecret, async (req, res) => {
       },
       line_items: [
         {
-          product_id: DEFAULT_PRODUCT_ID,
+          product_id: resolvedProductId,
           quantity: 1,
         },
       ],
